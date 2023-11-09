@@ -88,4 +88,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: MSIX Package
-        path: Manager\bin\Release
+        path: D:\a\EspuinoManager\EspuinoManager\Manager\bin\Release

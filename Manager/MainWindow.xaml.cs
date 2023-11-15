@@ -43,11 +43,26 @@ namespace Manager
         protected static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
         public data()
         {
-            Targets = new ObservableCollection<string>();
+            FileInfo fi = new FileInfo(KonfigFile);
+            if (!fi.Exists)
+            {
+                addLog("Keine Konfig vorhanden, erstelle leere");
+                if (!Directory.Exists(fi.DirectoryName))
+                    Directory.CreateDirectory(fi.DirectoryName);
+
+                konfig = new Konfig();
+            }
+            else
+            {
+                addLog("Konfig vorhanden, lade von: " + KonfigFile);
+                konfig = JsonSerializer.Deserialize<Konfig>(File.ReadAllText(KonfigFile));
+            }
+
+            client = new HttpClient();
+            client.Timeout = konfig.getHtppTimeout();
         }
 
-
-        public ObservableCollection<string> Targets { get; private set; }
+        public Konfig konfig { get; private set; }
 
         public ObservableCollection<RfidEntry> RfidEntries { get; private set; }
 
@@ -86,9 +101,8 @@ namespace Manager
                     _AddNewTarget = new RelayCommand(p =>
                     {
                         logger.Debug(nameof(AddNewTarget) + " click");
-                        Targets.Add(NewTarget);
-                        OnPropertyChanged(nameof(Targets));
-
+                        konfig.Targets.Add(NewTarget);
+                        saveKonfig();
                     },p =>
                     {
                         return !string.IsNullOrEmpty(NewTarget);
@@ -109,8 +123,30 @@ namespace Manager
                     _ReadFromEsp = new RelayCommand(async p =>
                     {
                         logger.Debug(nameof(ReadFromEsp) + " click");
+                        try
+                        {
+                            string url = "http://" + Target + "/rfid";
+                            addLog("Hole von: " + url);
+                            string response = await client.GetStringAsync(url);
+                            logger.Debug("Antwort: " + response);
 
-                        await ReadFromEspTask();
+                            RfidEntries = new ObservableCollection<RfidEntry>(
+                                            JsonSerializer.Deserialize<List<RfidEntry>>(
+                                            response,
+                                            new JsonSerializerOptions
+                                            {
+                                                PropertyNameCaseInsensitive = true,
+                                            }));
+                            OnPropertyChanged(nameof(RfidEntries));
+                        }
+                        catch (Exception exp)
+                        {
+                            do
+                            {
+                                addLog("Fehler: " + exp, NLog.LogLevel.Error);
+                                exp = exp.InnerException;
+                            } while (null != exp);
+                        }
                     }, p =>
                     {
                         //true = kann geklickt werden
@@ -121,36 +157,51 @@ namespace Manager
                 return _ReadFromEsp;
             }
         }
-        private async Task ReadFromEspTask()
-        {
-            HttpClient client = new HttpClient();
-            try
-            {
-                string url = "http://" + Target + "/rfid";
-                logger.Info("Hole von:" + url);
-                string response = await client.GetStringAsync(url);
-                logger.Debug("Antwort" + response);
 
-                RfidEntries = new ObservableCollection<RfidEntry>(
-                                JsonSerializer.Deserialize<List<RfidEntry>>(
-                                response,
-                                new JsonSerializerOptions
-                                {
-                                    PropertyNameCaseInsensitive = true,
-                                }));
-                OnPropertyChanged(nameof(RfidEntries));
-            }
-            catch (Exception exp)
+
+        private RelayCommand _WriteToEsp;
+        public RelayCommand WriteToEsp
+        {
+            get
             {
-                do
+                if (null == _WriteToEsp)
                 {
-                    logger.Error(exp, "Fehler");
-                    exp = exp.InnerException;
-                } while (null != exp);
+                    _WriteToEsp = new RelayCommand(async p =>
+                    {
+                        logger.Debug(nameof(WriteToEsp) + " click");                        
+                        try
+                        {
+                            string url = "http://" + Target + "/rfid";
+                            addLog("Schreibe nach: " + url);
+
+                            foreach (RfidEntry re in RfidEntries)
+                            {
+                                addLog("Schreibe " + re);
+                                StringContent stringContent = new StringContent(JsonSerializer.Serialize(re), Encoding.UTF8, "application/json");
+                                HttpResponseMessage httpResponseMessage = await client.PostAsync(url, stringContent);
+
+                                logger.Debug(httpResponseMessage.ToString());
+                            }
+                            addLog("Schreiben fertig");
+                        }
+                        catch (Exception exp)
+                        {
+                            do
+                            {
+                                addLog("Fehler: " + exp, NLog.LogLevel.Error);
+                                exp = exp.InnerException;
+                            } while (null != exp);
+                        }
+                    }, p =>
+                    {
+                        //true = kann geklickt werden
+                        return true;
+                    }
+                              );
+                }
+                return _WriteToEsp;
             }
         }
-
-
 
         private RelayCommand _ReadFromFile;
         public RelayCommand ReadFromFile
@@ -220,6 +271,49 @@ namespace Manager
                 return _WriteToFile;
             }
         }
+        
+        private HttpClient client;
+
+        private string _Log;
+        public string Log
+        {
+            get { return _Log; }
+            set { SetProperty(ref _Log, value); }
+        }
+        private void addLog(string s, NLog.LogLevel logLevel=null)
+        {
+            Log += "\n" + DateTime.Now + ": " + s;
+
+            if (null == logLevel)
+                logger.Info(s);
+            else
+                logger.Log(logLevel, s);
+        }
+
+        private void saveKonfig()
+        {
+            File.WriteAllText(KonfigFile,JsonSerializer.Serialize(konfig));
+        }
+
+        private readonly string KonfigFile = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\EspuinoManager\\Konfig.json";
+    }
+
+    public class Konfig : InpcBase
+    {
+        public Konfig()
+        {
+            Targets = new ObservableCollection<string>();
+            HttpTimeout = 5000; //in ms
+        }
+
+        public ObservableCollection<string> Targets { get; set; }
+
+        public int HttpTimeout { get; set; } //in ms
+
+        public TimeSpan getHtppTimeout()
+        {
+            return new TimeSpan(0, 0, 0, 0, HttpTimeout);
+        }
     }
 
     public class RfidEntry : InpcBase
@@ -245,14 +339,28 @@ namespace Manager
             modes = new List<PlayMode>()
             {
                 {new PlayMode{Value=0,Description="-" } },
+                {new PlayMode{Value=1,Description="Einzelner Titel" } },
+                {new PlayMode{Value=2,Description="Einzelner Titel (Endlosschleife)" } },
                 {new PlayMode{Value=3,Description="Hörbuch" } },
+                {new PlayMode{Value=4,Description="Hörbuch (Endlosschleife)" } },
                 {new PlayMode{Value=5,Description="Alle Titel eines Verzeichnis (sortiert)" } },
-                {new PlayMode{Value=8,Description="Webradio" } }
+                {new PlayMode{Value=6,Description="Alle Titel eines Verzeichnis (zufällig)" } },
+                {new PlayMode{Value=7,Description="Alle Titel eines Verzeichnis (sortiert, Endlosschleife)" } },
+                {new PlayMode{Value=8,Description="Webradio" } },
+                {new PlayMode{Value=9,Description="Alle Titel eines Verzeichnis (zufällig, Endlosschleife)" } },
+                {new PlayMode{Value=11,Description="Liste (Dateien von SD und/oder Webstreams) aus lokaler .m3u-Datei" } },
+                {new PlayMode{Value=12,Description="Einzelner Titel eines Verzeichnis (zufällig). Danach schlafen." } },
+                {new PlayMode{Value=13,Description="Alle Titel aus einem zufälligen Unterverzeichnis (sortiert)" } },
+                {new PlayMode{Value=14,Description="Alle Titel aus einem zufälligen Unterverzeichnis (zufällig)" } },
             };
         }
         [JsonIgnore]
         public List<PlayMode> modes { get; private set; }
 
+        public override string ToString()
+        {
+            return id + ": " + fileOrUrl;
+        }
 
         private string _id;
         public string id
@@ -396,5 +504,60 @@ namespace Manager
         }
 
         #endregion // ICommand Members
+    }
+
+    public static class TextBoxUtilities
+    {
+        public static readonly DependencyProperty AlwaysScrollToEndProperty = DependencyProperty.RegisterAttached("AlwaysScrollToEnd",
+                                                                                                                  typeof(bool),
+                                                                                                                  typeof(TextBoxUtilities),
+                                                                                                                  new PropertyMetadata(false, AlwaysScrollToEndChanged));
+
+        private static void AlwaysScrollToEndChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            TextBox tb = sender as TextBox;
+            if (tb != null)
+            {
+                bool alwaysScrollToEnd = (e.NewValue != null) && (bool)e.NewValue;
+                if (alwaysScrollToEnd)
+                {
+                    tb.ScrollToEnd();
+                    tb.TextChanged += TextChanged;
+                }
+                else
+                {
+                    tb.TextChanged -= TextChanged;
+                }
+            }
+            else
+            {
+                throw new InvalidOperationException("The attached AlwaysScrollToEnd property can only be applied to TextBox instances.");
+            }
+        }
+
+        public static bool GetAlwaysScrollToEnd(TextBox textBox)
+        {
+            if (textBox == null)
+            {
+                throw new ArgumentNullException("textBox");
+            }
+
+            return (bool)textBox.GetValue(AlwaysScrollToEndProperty);
+        }
+
+        public static void SetAlwaysScrollToEnd(TextBox textBox, bool alwaysScrollToEnd)
+        {
+            if (textBox == null)
+            {
+                throw new ArgumentNullException("textBox");
+            }
+
+            textBox.SetValue(AlwaysScrollToEndProperty, alwaysScrollToEnd);
+        }
+
+        private static void TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ((TextBox)sender).ScrollToEnd();
+        }
     }
 }

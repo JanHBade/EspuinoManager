@@ -10,76 +10,89 @@
         <local:data x:Name="d"/>
     </Window.DataContext>
     <DockPanel>
-        <ComboBox DockPanel.Dock="Top" Margin="5" ItemsSource="{Binding Targets}" SelectedItem="{Binding Target}"/>
+        <ComboBox DockPanel.Dock="Top" Margin="5" ItemsSource="{Binding konfig.Targets}" SelectedItem="{Binding Target}"/>
         <DockPanel DockPanel.Dock="Top">
             <TextBlock Margin="5" Text="Neues Ziel:"/>
             <TextBox Margin="5" MinWidth="200" Text="{Binding Path=NewTarget, UpdateSourceTrigger=PropertyChanged}"></TextBox>
             <Button Margin="5" DockPanel.Dock="Right" Command="{Binding AddNewTarget}">Hinzufügen</Button>
         </DockPanel>
-        <Button DockPanel.Dock="Top" Margin="5" Command="{Binding ReadFromEsp, IsAsync=True}">Lese vom ESP</Button>
+        <UniformGrid DockPanel.Dock="Top" Rows="1">
+            <Button Margin="5" Command="{Binding ReadFromEsp, IsAsync=True}" ToolTip="{Binding Target}">Lese vom ESP</Button>
+            <Button Margin="5" Command="{Binding WriteToEsp, IsAsync=True}" ToolTip="{Binding Target}">Schreibe zum ESP</Button>
+        </UniformGrid>
         <UniformGrid DockPanel.Dock="Top" Rows="1">
             <Button Margin="5" Command="{Binding ReadFromFile}">Lese aus Datei</Button>
             <Button Margin="5" Command="{Binding WriteToFile}">Schreibe in Datei</Button>
         </UniformGrid>
-        <ScrollViewer DockPanel.Dock="Bottom">
-            <ItemsControl Margin="5" ItemsSource="{Binding RfidEntries}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type local:RfidEntry}">
-                        <Border Margin="5" BorderThickness="1" BorderBrush="DarkCyan" CornerRadius="2">
-                            <Grid>
-                                <Grid.Resources>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Margin" Value="5"/>
-                                    </Style>
-                                    <Style TargetType="TextBox">
-                                        <Setter Property="Margin" Value="5"/>
-                                    </Style>
-                                </Grid.Resources>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="2*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition/>
-                                    <RowDefinition/>
-                                    <RowDefinition/>
-                                </Grid.RowDefinitions>
-                            
-                                <TextBlock Text="ID"/>
-                                <TextBox Grid.Column="1" Text="{Binding id}"/>
 
-                                <TextBlock Grid.Row="1" Text="Quelle"/>
-                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding fileOrUrl}"/>
+        <TextBox DockPanel.Dock="Bottom" Height="100" IsReadOnly="True"
+                 VerticalScrollBarVisibility="Visible"
+                 local:TextBoxUtilities.AlwaysScrollToEnd="True"
+                 Text="{Binding Log}"/>
+        
+        <TabControl DockPanel.Dock="Bottom">
+            <TabItem Header="RFID">
+                <ScrollViewer DockPanel.Dock="Bottom">
+                    <ItemsControl Margin="5" ItemsSource="{Binding RfidEntries}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:RfidEntry}">
+                                <Border Margin="5" BorderThickness="1" BorderBrush="DarkCyan" CornerRadius="2">
+                                    <Grid>
+                                        <Grid.Resources>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Margin" Value="5"/>
+                                            </Style>
+                                            <Style TargetType="TextBox">
+                                                <Setter Property="Margin" Value="5"/>
+                                            </Style>
+                                        </Grid.Resources>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="2*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition/>
+                                            <RowDefinition/>
+                                            <RowDefinition/>
+                                        </Grid.RowDefinitions>
 
-                                <Grid Grid.Row="2" Grid.ColumnSpan="2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition/>
-                                        <ColumnDefinition Width="2*"/>
-                                        <ColumnDefinition/>
-                                        <ColumnDefinition/>
-                                        <ColumnDefinition/>
-                                        <ColumnDefinition/>
-                                    </Grid.ColumnDefinitions>
+                                        <TextBlock Text="ID"/>
+                                        <TextBox Grid.Column="1" Text="{Binding id}"/>
+
+                                        <TextBlock Grid.Row="1" Text="Quelle"/>
+                                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding fileOrUrl}"/>
+
+                                        <Grid Grid.Row="2" Grid.ColumnSpan="2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition/>
+                                                <ColumnDefinition Width="2*"/>
+                                                <ColumnDefinition/>
+                                                <ColumnDefinition/>
+                                                <ColumnDefinition/>
+                                                <ColumnDefinition/>
+                                            </Grid.ColumnDefinitions>
 
 
-                                    <TextBlock Text="Play Mode"/>
-                                    <ComboBox Margin="2" Grid.Column="1"
+                                            <TextBlock Text="Play Mode"/>
+                                            <ComboBox Margin="2" Grid.Column="1"
                                               ItemsSource="{Binding modes}"
                                               SelectedItem="{Binding Path=playModeObj}"
                                               />
-                                    <!--<TextBox Grid.Column="1" Text="{Binding Path=playModeText, Mode=OneWay}"/>-->
+                                            <!--<TextBox Grid.Column="1" Text="{Binding Path=playModeText, Mode=OneWay}"/>-->
 
-                                    <TextBlock Grid.Column="2" Text="Letze Pos."/>
-                                    <TextBox Grid.Column="3" Text="{Binding lastPlayPos}"/>
+                                            <TextBlock Grid.Column="2" Text="Letze Pos."/>
+                                            <TextBox Grid.Column="3" Text="{Binding lastPlayPos}"/>
 
-                                    <TextBlock Grid.Column="4" Text="Letzer Track"/>
-                                    <TextBox Grid.Column="5" Text="{Binding trackLastPlayed}"/>
-                                </Grid>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+                                            <TextBlock Grid.Column="4" Text="Letzer Track"/>
+                                            <TextBox Grid.Column="5" Text="{Binding trackLastPlayed}"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>        
     </DockPanel>
 </Window>

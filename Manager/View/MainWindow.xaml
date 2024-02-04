@@ -33,7 +33,7 @@
         <TabControl DockPanel.Dock="Bottom">
             <TabItem Header="RFID">
                 <ScrollViewer DockPanel.Dock="Bottom">
-                    <ItemsControl Margin="5" ItemsSource="{Binding RfidEntries}">
+                    <ItemsControl Margin="5" ItemsSource="{Binding espuino.RfidEntries}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type local:RfidEntry}">
                                 <Border Margin="5" BorderThickness="1" BorderBrush="DarkCyan" CornerRadius="2">
@@ -92,6 +92,9 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Einstellungen">
+                
             </TabItem>
         </TabControl>        
     </DockPanel>
